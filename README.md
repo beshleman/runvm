@@ -6,6 +6,45 @@ and is really just meant to be used with those made from the
 
 ## Usage
 
+## Example using wrappers
+```bash
+# Download wrappers
+$ wget https://raw.githubusercontent.com/beshleman/makevm/main/wrappers/makevm
+$ wget https://raw.githubusercontent.com/beshleman/runvm/main/wrappers/boot
+$ wget https://raw.githubusercontent.com/beshleman/runvm/main/wrappers/ssh
+
+# Clone kernel
+$ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+
+# Create an images directory, build the kernel, and download everything
+# required to have have working Debian VM
+$ mkdir -p ./images
+$ ./makevm ./linux \
+	https://raw.githubusercontent.com/beshleman/configs/master/vsock.x86_64 \
+	./images
+
+# The images dir now contains everything needed to work with Debian Linux
+$ tree ./images
+images/
+├── config-6.3.0-rc1+
+├── debian_bullseye.qcow2
+├── initrd.img-6.3.0-rc1+
+├── System.map-6.3.0-rc1+
+├── vagrant.key
+├── vagrant.pub
+├── vmlinux
+└── vmlinuz-6.3.0-rc1+
+
+0 directories, 8 files
+
+# In one shell/tmux session
+$ ./boot -k images/vmlinuz-6.3.0-rc1+ -i ./images/initrd.img-6.3.0-rc1+ -d ./images/debian_bullseye.qcow2
+
+# In another shell/tmux session
+$ ./ssh uname -a
+Linux debian11.localdomain 6.3.0-rc1+ #5 SMP PREEMPT_DYNAMIC Mon Mar 13 16:18:16 UTC 2023 x86_64 GNU/Linux
+```
+
 ### Container
 
 #### Boot a VM
