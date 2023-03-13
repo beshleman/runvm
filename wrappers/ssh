@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -euo pipefail
+
+docker run \
+	-v$(pwd):$(pwd) \
+	-v/var/run/libvirt:/var/run/libvirt \
+	-w$(pwd) \
+	--network host \
+	-it beshleman/runvm ssh $@

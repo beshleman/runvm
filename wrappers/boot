@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -euo pipefail
+
+opts=""
+while getopts ":k:i:d:s:" opt; do
+	case "${opt}"  in
+		k)
+			kernel="$(realpath ${OPTARG})"
+			;;
+		i)
+			initrd="$(realpath ${OPTARG})"
+			;;
+		d)
+			disk="$(realpath ${OPTARG})"
+			;;
+		s)
+			sourcedir="$(realpath ${OPTARG})"
+			opts="-s ${sourcedir}"
+			;;
+	esac
+done
+
+mounts=()
+mounts+=($(dirname ${kernel}))
+mounts+=($(dirname ${disk}))
+mounts+=($(dirname ${initrd}))
+
+mountargs=""
+for mount in ${mounts[*]};
+do
+	mountargs="-v${mount}:${mount}"
+done
+
+docker run \
+	-v$(pwd):$(pwd) \
+	-w$(pwd) \
+	-v/var/run/libvirt:/var/run/libvirt \
+	${mountargs} \
+	--privileged \
+	--network host \
+	-it beshleman/runvm boot \
+	-k ${kernel} -i ${initrd} -d ${disk} "${opts}"
