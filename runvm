@@ -160,7 +160,7 @@ do_ssh() {
 		chmod 600 ${SSH_KEY}
 	fi
 
-	ssh -i ${SSH_KEY} vagrant@${ip} $@
+	ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} vagrant@${ip} $@
 }
 
 wait_for_ip() {
