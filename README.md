@@ -45,6 +45,12 @@ $ ./ssh uname -a
 Linux debian11.localdomain 6.3.0-rc1+ #5 SMP PREEMPT_DYNAMIC Mon Mar 13 16:18:16 UTC 2023 x86_64 GNU/Linux
 ```
 
+Save time by using a config file:
+
+```bash
+./boot -c config.sh
+```
+
 ### Container
 
 #### Boot a VM
