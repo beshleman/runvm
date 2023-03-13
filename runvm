@@ -146,6 +146,7 @@ get_ip() {
 }
 
 do_ssh() {
+	wait_for_ip
 	local ip="$(get_ip)"
 
 	echo "Downloading insecure vagrant SSH key..."
@@ -163,7 +164,7 @@ wait_for_ip() {
 	for i in {1..30}; do
 		ip=$(get_ip)
 		if [ -n "$ip" ]; then
-			echo "VM IP address: $ip"
+			printf "\nVM IP address: $ip\n"
 			return
 		else
 			sleep 1
