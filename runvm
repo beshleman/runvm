@@ -218,6 +218,11 @@ kernel=""
 initrd=""
 disk=""
 
+if [[ "$#" -lt 1 ]]; then
+	show_help
+	exit 1
+fi
+
 subcommand=$1
 shift
 
