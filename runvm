@@ -149,8 +149,8 @@ do_ssh() {
 	wait_for_ip
 	local ip="$(get_ip)"
 
-	echo "Downloading insecure vagrant SSH key..."
 	if [[ ! -e ${SSH_KEY} ]]; then
+		echo "Downloading insecure vagrant SSH key..."
 		wget https://raw.githubusercontent.com/hashicorp/vagrant/main/keys/vagrant \
 			-O ${SSH_KEY}
 		chmod 600 ${SSH_KEY}
