@@ -3,7 +3,7 @@
 set -euo pipefail
 
 opts=""
-while getopts ":k:i:d:s:" opt; do
+while getopts ":k:i:d:s:c:" opt; do
 	case "${opt}"  in
 		k)
 			kernel="$(realpath ${OPTARG})"
@@ -14,12 +14,19 @@ while getopts ":k:i:d:s:" opt; do
 		d)
 			disk="$(realpath ${OPTARG})"
 			;;
+		c)
+			config="$(realpath ${OPTARG})"
+			;;
 		s)
 			sourcedir="$(realpath ${OPTARG})"
 			opts="-s ${sourcedir}"
 			;;
 	esac
 done
+
+if [[ -e "${config:-}" ]]; then
+	source "${config}"
+fi
 
 mounts=()
 mounts+=($(dirname ${kernel}))
