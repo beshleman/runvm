@@ -1,0 +1,265 @@
+#!/bin/bash
+
+set -euo pipefail
+
+PROG=$(basename $0)
+
+PROJECT_ID=$(pwd | base64 | tr -d '=')
+CACHE_DIR=$(pwd)/.cache/runvm/
+mkdir -p ${CACHE_DIR}
+SSH_KEY=${CACHE_DIR}/vagrant.key
+MAC_FILE=${CACHE_DIR}/macaddr.txt
+
+show_help() {
+	echo "Usage: ${PROG} SUBCOMMAND [options]"
+	echo ""
+	echo "Subcommands:"
+	echo "  boot               Boot a system"
+	echo "  ssh                Connect to the VM"
+	echo ""
+	echo "Options for Subcommand 'boot':"
+	echo "  -k <kernel>        Path to kernel (required)"
+	echo "  -i <initrd>        Path to initrd (required)"
+	echo "  -d <disk>          Path to disk (required)"
+	echo "  -s <source>        Path to linux source (optional, shared with guest over 9p)"
+	echo ""
+	echo "Examples:"
+	echo "  ${PROG} boot -k /path/to/kernel -i /path/to/initrd -d /path/to/disk"
+	echo "  ${PROG} ssh"
+}
+
+get_bridge_name() {
+	# Use grep to extract the 'name' attribute from the default net xml
+	name_attr=$(virsh net-dumpxml default | grep -o "name='[^']*'")
+
+	# Use sed to remove the 'name=' prefix and the quotes around the attribute value
+	bridge_name=$(echo "$name_attr" | sed "s/name='\([^']*\)'/\1/")
+
+	echo $bridge_name
+}
+
+mac_address_get() {
+	local macaddr
+	if [[ ! -e "${MAC_FILE}" ]]; then
+		macaddr=$(generate_mac_address)
+		echo "${macaddr}" > ${MAC_FILE}
+	else
+		macaddr=$(cat ${MAC_FILE})
+	fi
+	echo "${macaddr}"
+}
+
+generate_random_name() {
+	# Array of nouns
+	nouns=(apple banana cat dog elephant fish gorilla horse igloo jelly kangaroo lemon monkey)
+
+	# Generate random indices for the two nouns
+	noun_index_1=$(( RANDOM % ${#nouns[@]} ))
+	noun_index_2=$(( RANDOM % ${#nouns[@]} ))
+
+	# Get the nouns at the selected indices
+	noun_1=${nouns[$noun_index_1]}
+	noun_2=${nouns[$noun_index_2]}
+
+	# Concatenate the two nouns with a dash
+	random_name="${noun_1}_${noun_2}"
+
+	echo $random_name
+}
+
+
+
+setup_dhcp() {
+    # Use the bridge that libvirt configured and use libvirt's DHCP
+    # config to setup an IP address to be given to the VM
+    local network=default
+    local name="$(generate_random_name)"
+
+    virsh net-update "${network}" modify ip-dhcp-host \
+           "<host mac='$(mac_address_get)' name='${name}' ip='${IP}' />" \
+           --live --config || true
+}
+
+__generate_mac_address() {
+	hexchars="0123456789abcdef"
+	mac=""
+	# Generate the first three octets
+	for i in {1..3}; do
+		octet=""
+		for j in {1..2}; do
+			octet="$octet${hexchars:$((RANDOM % 16)):1}"
+		done
+		mac="$mac$octet:"
+	done
+	# Generate the last three octets
+	for i in {1..3}; do
+		octet=""
+		for j in {1..2}; do
+			octet="$octet${hexchars:$((RANDOM % 16)):1}"
+		done
+		mac="$mac$octet"
+		if [[ $i -lt 3 ]]; then
+			mac="$mac:"
+		fi
+	done
+	echo "$mac"
+}
+
+is_multicast_mac() {
+    # Get the first octet of the MAC address
+    first_octet=$(echo $1 | cut -d ':' -f 1)
+
+    # Convert the first octet to binary
+    binary_first_octet=$(echo "ibase=16;obase=2;$first_octet" | bc | awk '{printf "%08d\n", $1}')
+
+    # Check if the least significant bit of the binary representation is set
+    if [ ${binary_first_octet:-1} -eq 1 ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+generate_mac_address() {
+	local mac=$(__generate_mac_address)
+
+	if [[ "$(is_multicast_mac ${mac})" = "true" ]];
+	then
+		mac=$(__generate_mac_address)
+	fi
+
+	echo "${mac}"
+}
+
+get_ip_for_mac() {
+	mac=$1
+	ip=$(virsh net-dhcp-leases default | grep $mac | awk '{print $5}' | cut -d '/' -f 1)
+
+	if [ -z "$ip" ]; then
+		echo "Error: no IP address found for MAC address $mac"
+		exit 1
+	fi
+
+	echo $ip
+}
+
+get_ip() {
+	local mac="$(mac_address_get)"
+	local ip="$(get_ip_for_mac $(mac_address_get))"
+
+	echo "${ip}"
+}
+
+do_ssh() {
+	local ip="$(get_ip)"
+
+	echo "Downloading insecure vagrant SSH key..."
+	if [[ ! -e ${SSH_KEY} ]]; then
+		wget https://raw.githubusercontent.com/hashicorp/vagrant/main/keys/vagrant \
+			-O ${SSH_KEY}
+		chmod 600 ${SSH_KEY}
+	fi
+
+	ssh -i ${SSH_KEY} vagrant@${ip} $@
+}
+
+wait_for_ip() {
+	echo "Waiting for VM to get IP address"
+	for i in {1..30}; do
+		ip=$(get_ip)
+		if [ -n "$ip" ]; then
+			echo "VM IP address: $ip"
+			return
+		else
+			sleep 1
+			printf "."
+		fi
+	done
+	>&2 echo "Timeout waiting VM to get IP address"
+	exit 1
+}
+
+do_boot() {
+	local mac=$(mac_address_get)
+	local bridge=$(get_bridge_name)
+        local vsock_cid=10
+	local logfile=./qemu.log
+	local opts=""
+        opts="${opts} -netdev bridge,br=${bridge},id=hostnet0"
+        opts="${opts} -device virtio-net-pci,netdev=hostnet0,id=net0,mac=${mac}"
+	opts="${opts} -device vhost-vsock-pci,guest-cid=${vsock_cid}"
+
+	if [[ -n "${sourcedir}" ]]; then
+		opts="${opts} -fsdev local,security_model=none,id=fsdev0,path=${sourcedir}"
+		opts="${opts} -device virtio-9p-pci,fsdev=fsdev0,mount_tag=source"
+	fi
+
+	qemu-system-x86_64 \
+		-cpu host \
+		-enable-kvm \
+		-m $(( 16 * 1024 )) \
+		-smp 16 \
+		-drive file=${disk},if=virtio \
+		-no-reboot \
+		${opts} \
+		-fsdev local,security_model=none,id=fsdev1,path=$(pwd) \
+			-device virtio-9p-pci,fsdev=fsdev1,mount_tag=project \
+		-nographic \
+		-kernel ${kernel} \
+		-initrd ${initrd} \
+		-append "root=/dev/vda3 ro console=ttyS0 net.ifnames=0 biosdevname=0" \
+		2>&1 > "${logfile}" &
+
+	echo "VM boot log at ${logfile}"
+	wait_for_ip
+}
+
+kernel=""
+initrd=""
+disk=""
+
+subcommand=$1
+shift
+
+while getopts ":k:i:d:s:" opt; do
+	case "${opt}"  in
+		k)
+			kernel="${OPTARG}"
+			;;
+		i)
+			initrd="${OPTARG}"
+			;;
+		d)
+			disk="${OPTARG}"
+			;;
+		s)
+			sourcedir="${OPTARG}"
+			;;
+		\?)
+			echo "Invalid option: -" >&2
+			show_help
+			exit 1
+			;;
+		:)
+			echo "Option - requires an argument." >&2
+			show_help
+			exit 1
+			;;
+	esac
+done
+
+sourcedir=${sourcedir:-}
+
+if [[ "${subcommand}" = "boot" ]]; then
+	if [[ -z "${kernel}" || -z "${initrd}"  || -z "${disk}" ]]; then
+		echo "Missing arguments for boot subcommand."
+		show_help
+		exit 1
+	fi
+	do_boot   
+elif [[ "${subcommand}" = "ssh" ]]; then
+	do_ssh $@
+else
+	show_help
+	exit 1
+fi
