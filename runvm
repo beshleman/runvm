@@ -204,10 +204,7 @@ do_boot() {
 		-kernel ${kernel} \
 		-initrd ${initrd} \
 		-append "root=/dev/vda3 ro console=ttyS0 net.ifnames=0 biosdevname=0" \
-		2>&1 > "${logfile}" &
-
-	echo "VM boot log at ${logfile}"
-	wait_for_ip
+		2>&1 | tee ${logfile}
 }
 
 kernel=""
