@@ -6,6 +6,33 @@ and is really just meant to be used with those made from the
 
 ## Usage
 
+### Container
+
+#### Boot a VM
+```bash
+docker run \
+	-v$(pwd):$(pwd) \
+	-w$(pwd) \
+	-v/var/run/libvirt:/var/run/libvirt \
+	-v/path/to/images:/path/to/images \
+	--privileged \
+	--network host \
+	-it beshleman/runvm boot \
+	-k /path/to/images/kernel -i /path/to/images/initrd -d /path/to/images/disk
+```
+
+#### SSH into VM
+```bash
+docker run \
+	-v$(pwd):$(pwd) \
+	-v/var/run/libvirt:/var/run/libvirt \
+	-w$(pwd) \
+	--network host \
+	-it beshleman/runvm ssh
+```
+
+### Script
+
 ```bash
 Usage: runvm SUBCOMMAND [options]
 
