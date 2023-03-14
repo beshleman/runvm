@@ -6,7 +6,27 @@ and is really just meant to be used with those made from the
 
 ## Usage
 
+## Prerequisites
+
+Make sure that `libvirt` and `qemu` are installed, `export LIBVIRT_DEFAULT_URI='qemu:///system'`
+is set, and that the default libvirt network is setup.
+
+The net info for the default network should have a virbr0 bridge
+and be active:
+
+```bash
+$ export LIBVIRT_DEFAULT_URI='qemu:///system'`
+$ virsh net-info default
+Name:           default
+UUID:           50531db3-f092-49be-9bb9-751506022cbc
+Active:         yes
+Persistent:     yes
+Autostart:      yes
+Bridge:         virbr0
+```
+
 ## Example using wrappers
+
 ```bash
 # Download wrappers
 $ wget https://raw.githubusercontent.com/beshleman/makevm/main/wrappers/makevm
@@ -40,8 +60,6 @@ images/
 ├── vagrant.pub
 ├── vmlinux
 └── vmlinuz-6.3.0-rc1+
-
-0 directories, 8 files
 
 # In one shell/tmux session
 $ ./boot -k images/vmlinuz-6.3.0-rc1+ -i images/initrd.img-6.3.0-rc1+ -d images/debian_bullseye.qcow2
