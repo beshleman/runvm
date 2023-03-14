@@ -8,7 +8,7 @@ and is really just meant to be used with those made from the
 
 ## Prerequisites
 
-Make sure that `libvirt` and `qemu` are installed, `export LIBVIRT_DEFAULT_URI='qemu:///system'`
+Make sure that `docker`, `libvirt` and `qemu` are installed, `export LIBVIRT_DEFAULT_URI='qemu:///system'`
 is set, and that the default libvirt network is setup.
 
 The net info for the default network should have a virbr0 bridge
