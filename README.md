@@ -62,7 +62,7 @@ images/
 └── vmlinuz-6.3.0-rc1+
 
 # In one shell/tmux session
-$ ./boot -k images/vmlinuz-6.3.0-rc1+ -i images/initrd.img-6.3.0-rc1+ -d images/debian_bullseye.qcow2
+$ ./boot -k images/vmlinuz-* -i images/initrd.img-* -d images/debian_bullseye.qcow2
 
 # In another shell/tmux session
 $ ./ssh uname -a
