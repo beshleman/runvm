@@ -17,6 +17,11 @@ $ chmod +x makevm boot ssh
 # Clone kernel
 $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 
+# Download Debian certs (required by the vsock.x86_64 config used below, not required by other non-Debian configs)
+$ mkdir -p linux/debian/certs
+$ wget https://salsa.debian.org/kernel-team/linux/-/raw/master/debian/certs/debian-uefi-certs.pem \
+          -O linux/debian/certs/debian-uefi-certs.pem
+
 # Create an images directory, build the kernel, and download everything
 # required to have have working Debian VM
 $ mkdir -p ./images
