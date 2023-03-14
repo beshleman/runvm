@@ -12,6 +12,7 @@ and is really just meant to be used with those made from the
 $ wget https://raw.githubusercontent.com/beshleman/makevm/main/wrappers/makevm
 $ wget https://raw.githubusercontent.com/beshleman/runvm/main/wrappers/boot
 $ wget https://raw.githubusercontent.com/beshleman/runvm/main/wrappers/ssh
+$ chmod +x makevm boot ssh
 
 # Clone kernel
 $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
