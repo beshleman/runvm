@@ -24,12 +24,35 @@ show_help() {
 	echo "  -i <initrd>            Path to initrd (required)"
 	echo "  -d <disk>              Path to disk (required)"
 	echo "  -s <source>            Path to linux source (optional, shared with guest over 9p)"
+	echo "                         This can be any directory you want to share."
 	echo "  -n [bridged | user]    The network to use, either bridged or user (slirp) (default: bridged)"
 	echo "  -m <memory>            RAM for VM in MB (default: 16384)"
+	echo "  -c <config>            configuration file for passing all arguments (optional)"
+	echo "                         See 'Configuration Format' below for configuration format."
 	echo ""
 	echo "Examples:"
 	echo "  ${PROG} boot -k /path/to/kernel -i /path/to/initrd -d /path/to/disk"
 	echo "  ${PROG} ssh"
+	echo ""
+	echo "Configuration Format:"
+	echo "The configuration file is just a bash file. Set normal bash variables as defined below:"
+	echo ""
+	echo "kernel: the 'kernel' argument"
+	echo "initrd: the 'initrd' argument"
+	echo "disk: the 'disk' argument"
+	echo "sourcedir: the 'source' argument"
+	echo "network: the 'network' argument (bridged or user)"
+	echo "memory: the 'memory' argument (bridged or user)"
+	echo ""
+	echo "Example Configuration:"
+	echo ""
+	echo "# guest vm config"
+	echo "kernel=/data00/linux/arch/x86/boot/bzImage"
+	echo "disk=/data00/images/guest.qcow2"
+	echo "initrd=/data00/images/initrd.img-6.3.0-rc2+"
+	echo "sourcedir=/data00/linux/"
+	echo "network=bridged"
+	echo 'memory=$(( 4 * 1024 )) # 4GB'
 }
 
 get_bridge_name() {
@@ -254,7 +277,7 @@ fi
 subcommand=$1
 shift
 
-while getopts ":k:i:d:s:n:" opt; do
+while getopts ":k:i:d:s:n:m:c:" opt; do
 	case "${opt}"  in
 		k)
 			kernel="${OPTARG}"
