@@ -2,41 +2,14 @@
 
 set -euo pipefail
 
-opts=""
-while getopts ":k:i:d:s:c:" opt; do
-	case "${opt}"  in
-		k)
-			kernel="$(realpath ${OPTARG})"
-			;;
-		i)
-			initrd="$(realpath ${OPTARG})"
-			;;
-		d)
-			disk="$(realpath ${OPTARG})"
-			;;
-		c)
-			config="$(realpath ${OPTARG})"
-			;;
-		s)
-			sourcedir="$(realpath ${OPTARG})"
-			opts="-s ${sourcedir}"
-			;;
-	esac
-done
-
-if [[ -e "${config:-}" ]]; then
-	source "${config}"
-fi
-
-mounts=()
-mounts+=($(dirname ${kernel}))
-mounts+=($(dirname ${disk}))
-mounts+=($(dirname ${initrd}))
-
 mountargs=""
-for mount in ${mounts[*]};
-do
-	mountargs="-v${mount}:${mount}"
+for arg in "$@"; do
+	if [[ $arg != -* ]]; then
+		mount="$(realpath $(dirname ${arg}))"
+		if [[ -d "${mount}" ]]; then
+			mountargs="${mountargs} -v${mount}:${mount}"
+		fi
+	fi
 done
 
 docker run \
@@ -47,4 +20,4 @@ docker run \
 	--privileged \
 	--network host \
 	-it beshleman/runvm boot \
-	-k ${kernel} -i ${initrd} -d ${disk} "${opts}"
+	$@

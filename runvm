@@ -8,7 +8,9 @@ PROJECT_ID=$(pwd | base64 | tr -d '=')
 CACHE_DIR=$(pwd)/.cache/runvm/
 mkdir -p ${CACHE_DIR}
 SSH_KEY=${CACHE_DIR}/vagrant.key
+SSH_USER_PORT=2222
 MAC_FILE=${CACHE_DIR}/macaddr.txt
+NETWORK_FILE=${CACHE_DIR}/network
 
 show_help() {
 	echo "Usage: ${PROG} SUBCOMMAND [options]"
@@ -18,10 +20,12 @@ show_help() {
 	echo "  ssh                Connect to the VM"
 	echo ""
 	echo "Options for Subcommand 'boot':"
-	echo "  -k <kernel>        Path to kernel (required)"
-	echo "  -i <initrd>        Path to initrd (required)"
-	echo "  -d <disk>          Path to disk (required)"
-	echo "  -s <source>        Path to linux source (optional, shared with guest over 9p)"
+	echo "  -k <kernel>            Path to kernel (required)"
+	echo "  -i <initrd>            Path to initrd (required)"
+	echo "  -d <disk>              Path to disk (required)"
+	echo "  -s <source>            Path to linux source (optional, shared with guest over 9p)"
+	echo "  -n [bridged | user]    The network to use, either bridged or user (slirp) (default: bridged)"
+	echo "  -m <memory>            RAM for VM in MB (default: 16384)"
 	echo ""
 	echo "Examples:"
 	echo "  ${PROG} boot -k /path/to/kernel -i /path/to/initrd -d /path/to/disk"
@@ -139,13 +143,19 @@ get_ip_for_mac() {
 }
 
 get_ip() {
-	local mac="$(mac_address_get)"
-	local ip="$(get_ip_for_mac $(mac_address_get))"
+	local network=$(cat ${NETWORK_FILE})
+
+	if [[ "${network}" = "bridged" ]]; then
+		local ip="$(get_ip_for_mac $(mac_address_get))"
+	else
+		local ip=localhost
+	fi
 
 	echo "${ip}"
 }
 
 do_ssh() {
+	local network="$(cat ${NETWORK_FILE})"
 	local ip="$(get_ip)"
 
 	if [[ ! -e ${SSH_KEY} ]]; then
@@ -155,7 +165,16 @@ do_ssh() {
 		chmod 600 ${SSH_KEY}
 	fi
 
-	ssh -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${SSH_KEY} vagrant@${ip} $@
+	local opts=""
+	if [[ "${network}" = "user" ]]; then
+		opts="-p ${SSH_USER_PORT}"
+	fi
+
+	opts="${opts} -o LogLevel=quiet"
+	opts="${opts} -o StrictHostKeyChecking=no"
+	opts="${opts} -i ${SSH_KEY}"
+
+	ssh ${opts} vagrant@${ip} $@
 }
 
 wait_for_ip() {
@@ -175,13 +194,29 @@ wait_for_ip() {
 }
 
 do_boot() {
+	if [[ -n "${config}" ]]; then
+		source "${config}"
+	fi
+
+	memory=${memory:-$(( 16 * 1024 ))}
+	network=${network:-bridged}
+	sourcedir=${sourcedir:-}
+
 	local mac=$(mac_address_get)
-	local bridge=$(get_bridge_name)
         local vsock_cid=10
 	local logfile=./qemu.log
 	local opts=""
-        opts="${opts} -netdev bridge,br=${bridge},id=hostnet0"
-        opts="${opts} -device virtio-net-pci,netdev=hostnet0,id=net0,mac=${mac}"
+
+	echo "${network}" > ${NETWORK_FILE}
+	if [[ "${network}" = "bridged" ]]; then
+		local bridge=$(get_bridge_name)
+		opts="${opts} -netdev bridge,br=${bridge},id=hostnet0"
+		opts="${opts} -device virtio-net-pci,netdev=hostnet0,id=net0,mac=${mac}"
+	else
+		opts="${opts} -netdev user,id=n0,hostfwd=tcp::${SSH_USER_PORT}-:22"
+		opts="${opts} -device virtio-net-pci,netdev=n0,mac=${mac}"
+	fi
+
 	opts="${opts} -device vhost-vsock-pci,guest-cid=${vsock_cid}"
 
 	if [[ -n "${sourcedir}" ]]; then
@@ -209,6 +244,7 @@ do_boot() {
 kernel=""
 initrd=""
 disk=""
+network=""
 
 if [[ "$#" -lt 1 ]]; then
 	show_help
@@ -218,7 +254,7 @@ fi
 subcommand=$1
 shift
 
-while getopts ":k:i:d:s:" opt; do
+while getopts ":k:i:d:s:n:" opt; do
 	case "${opt}"  in
 		k)
 			kernel="${OPTARG}"
@@ -229,8 +265,17 @@ while getopts ":k:i:d:s:" opt; do
 		d)
 			disk="${OPTARG}"
 			;;
+		n)
+			network="${OPTARG}"
+			;;
 		s)
 			sourcedir="${OPTARG}"
+			;;
+		m)
+			memory="${OPTARG}"
+			;;
+		c)
+			config="${OPTARG}"
 			;;
 		\?)
 			echo "Invalid option: -" >&2
@@ -245,7 +290,7 @@ while getopts ":k:i:d:s:" opt; do
 	esac
 done
 
-sourcedir=${sourcedir:-}
+config=${config:-}
 
 if [[ "${subcommand}" = "boot" ]]; then
 	if [[ -z "${kernel}" || -z "${initrd}"  || -z "${disk}" ]]; then
