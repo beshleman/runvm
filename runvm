@@ -221,6 +221,12 @@ do_boot() {
 		source "${config}"
 	fi
 
+	if [[ -z "${kernel}" || -z "${initrd}"  || -z "${disk}" ]]; then
+		echo "Missing arguments for boot subcommand."
+		show_help
+		exit 1
+	fi
+
 	memory=${memory:-$(( 16 * 1024 ))}
 	network=${network:-bridged}
 	sourcedir=${sourcedir:-}
@@ -316,11 +322,6 @@ done
 config=${config:-}
 
 if [[ "${subcommand}" = "boot" ]]; then
-	if [[ -z "${kernel}" || -z "${initrd}"  || -z "${disk}" ]]; then
-		echo "Missing arguments for boot subcommand."
-		show_help
-		exit 1
-	fi
 	do_boot   
 elif [[ "${subcommand}" = "ssh" ]]; then
 	do_ssh $@
