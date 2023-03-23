@@ -235,6 +235,7 @@ do_boot() {
         local vsock_cid=10
 	local logfile=./qemu.log
 	local opts=""
+	local vcpus=16
 
 	echo "${network}" > ${NETWORK_FILE}
 	if [[ "${network}" = "bridged" ]]; then
@@ -243,7 +244,7 @@ do_boot() {
 		opts="${opts} -device virtio-net-pci,netdev=hostnet0,id=net0,mac=${mac}"
 	else
 		opts="${opts} -netdev user,id=n0,hostfwd=tcp::${SSH_USER_PORT}-:22"
-		opts="${opts} -device virtio-net-pci,netdev=n0,mac=${mac}"
+		opts="${opts} -device virtio-net-pci,netdev=n0,mac=${mac},mq=on,vectors=$((${vcpus}} * 2 + 2))"
 	fi
 
 	opts="${opts} -device vhost-vsock-pci,guest-cid=${vsock_cid}"
@@ -257,7 +258,7 @@ do_boot() {
 		-cpu host \
 		-enable-kvm \
 		-m ${memory} \
-		-smp 16 \
+		-smp ${vcpus} \
 		-drive file=${disk},if=virtio \
 		-no-reboot \
 		${opts} \
