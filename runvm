@@ -232,7 +232,6 @@ do_boot() {
 	sourcedir=${sourcedir:-}
 
 	local mac=$(mac_address_get)
-        local vsock_cid=10
 	local logfile=./qemu.log
 	local opts=""
 	local vcpus=16
@@ -247,7 +246,9 @@ do_boot() {
 		opts="${opts} -device virtio-net-pci,netdev=n0,mac=${mac},mq=on,vectors=$((${vcpus}} * 2 + 2))"
 	fi
 
-	opts="${opts} -device vhost-vsock-pci,guest-cid=${vsock_cid}"
+	if [[ -n "${vsock_cid:-}" ]]; then
+		opts="${opts} -device vhost-vsock-pci,guest-cid=${vsock_cid}"
+	fi
 
 	if [[ -n "${sourcedir}" ]]; then
 		opts="${opts} -fsdev local,security_model=none,id=fsdev0,path=${sourcedir}"

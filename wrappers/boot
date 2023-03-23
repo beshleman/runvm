@@ -1,19 +1,51 @@
 #!/bin/bash
 
 set -euo pipefail
+set -x
 
-mountargs=""
+ARGS=$@
+getarg=0
 for arg in "$@"; do
+	if [[ "${getarg}" = "1" ]]; then
+		config=${arg}
+		unset getarg
+		break
+	fi
+	if [[ "${arg}" = "-c" ]]; then
+		getarg=1
+	fi
+done
+
+source ${config}
+
+ARGS="${ARGS} ${kernel:-}"
+ARGS="${ARGS} ${initrd:-}"
+ARGS="${ARGS} ${disk:-}"
+ARGS="${ARGS} ${network:-}"
+ARGS="${ARGS} ${sourcedir:-}"
+ARGS="${ARGS} ${config:-}"
+
+mounts=($(pwd))
+for arg in ${ARGS[@]}; do
 	if [[ $arg != -* ]]; then
 		mount="$(realpath $(dirname ${arg}))"
 		if [[ -d "${mount}" ]]; then
-			mountargs="${mountargs} -v${mount}:${mount}"
+			mounts+=("${mount}")
 		fi
 	fi
 done
 
+# Remove duplicate mounts
+mounts=($(echo "${mounts[@]}" | tr ' ' '\n' | awk '!a[$0]++'))
+
+mountargs=""
+for mount in ${mounts[*]}; do
+	mountargs="${mountargs} -v${mount}:${mount}"
+done
+
+mountargs=$(echo "${mountargs}" | sort -u)
+
 docker run \
-	-v$(pwd):$(pwd) \
 	-w$(pwd) \
 	-v/var/run/libvirt:/var/run/libvirt \
 	${mountargs} \
